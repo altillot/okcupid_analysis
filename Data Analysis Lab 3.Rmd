@@ -1,0 +1,130 @@
+---
+title: "Data Analysis Lab 3"
+author: "Andrea Tillotson"
+date: "10/27/2021"
+output:
+  pdf_document: default
+  word_document: default
+---
+```{r message = FALSE}
+library(tidyverse)
+library(ggplot2)
+cupid <- read.csv("okcupid_profiles.csv")
+```
+# 1 Simple bivariate regression
+
+I was curious about how men and women describe their body types on online dating platforms like OK Cupid. In particular, I wondered how men and women might differ in their use of the words "athletic" and "fit" to describe their bodies. Although both terms might communicate that a user is healthy, active, and toned, men and women might gravitate towards different terms given societal beliefs about gender. I hypothesize that men will gravitate more towards describing themselves as "athletic" than fit. Boys and men are often associated with the idea of athleticism, so it seems possible that they would be more likely to self-identify in this way. On the other hand, I predict women will be more likely to describe themselves as "fit".
+
+To test this, I first recoded the variable *sex*  and made it a dummy variable *sex_du*. I also recoded the variable *body_type*, where users self-identified one of 12 possible body types. To simply the analysis, I only included "athletic", "average", and "fit", choosing to include the "average" response to have a point of comparison for my terms of interest. Lastly, I subset the data into a new data frame, *cupid_new*, and removed any NA values before running my regression.
+
+```{r}
+# Recoding sex variable
+cupid <- cupid %>% mutate(sex_du = case_when(
+  sex == "m" ~ 0,
+  sex == "f" ~ 1
+))
+
+# Recoding body_type variable
+cupid <- cupid %>% mutate(body_new = case_when(
+  body_type == "athletic" ~ 1,
+  body_type == "average" ~ 2,
+  body_type == "fit" ~ 3,
+))
+
+## Subsetting data and removing rows with NAs
+cupid2 <- cupid[ , 32:33]
+cupid2 <- cupid2 %>% 
+  filter(!is.na(sex_du), !is.na(body_new))
+
+# Regression
+lm_sb <- lm(body_new ~ sex_du, data = cupid2)
+summary(lm_sb)
+```
+Both the intercept and the sex_du coefficient are statistically significant at the 0.001 level. However, the adjusted r-squared is only about 0.016 so sex seems to explain only 1.6% of the variation in self-identified body type (for only the "athletic," "average," and "fit" options). Because males were coded as 0, we can interpret the intercept of 1.95 as indicating that on average males describe themselves as "athletic" 0.05 points more than as "average." This aligns with my initial hypothesis that men would describe themselves as "athletic" more so than they describe themselves as "fit." Had men described themselves as "fit" more so than as "athletic," the intercept would have been greater than 2.
+
+The sex_du coefficient can be interpreted as saying that, if a respondent identifies as female, she describes herself as "fit" about 0.22 points more than a man, on average. This also supports my hypothesis that female users of OK Cupid would describe themselves as fit more so than they describe themselves as athletic. Interestingly, while men didn't describe themselves as athletic that much more than as average (only a 0.05 difference), women were comparatively much more likely to describe themselves as fit than as average (about 0.17 points over 2).
+
+# 2 Adding an additional variable
+
+I decided to examine whether age might contribute some explanatory power to the model. I hypothesized that older individuals would describe themselves as average more so than younger individuals would. Because of this, I expected the intercept to decrease because the intercept with the age interaction would represent younger individuals as well as men. I expected an increase in age to yield an increase in body_new score if the intercept was less than two (indicating than an age increase leads people to choose average more) and a decrease in body_new score if the initial intercept was greater than two (again, bringing older individuals closer to "average"). I also expected the effects of the *body_new* variable to be much smaller than in the first model, with more of the variability being explained by how old a respondent was. 
+
+```{r}
+# Subsetting data and removing rows with NAs, recoding age so the intercept
+# is at the mean age
+cupid3 <- cupid[ , c(1, 32:33)] %>%
+  filter(!is.na(sex_du), !is.na(body_new), !is.na(age))
+
+# Regression
+lm_sb2 <- lm(body_new ~ sex_du + age, data = cupid3)
+summary(lm_sb2)
+```
+All results were significant at the 0.001 level, though the adjusted R-squared did not increase by very much explaining only about .26% more of the variation in *body_new* than the first model. As expected, the new intercept was about 0.14 points lower than the first model's intercept. Given that the intercept was below 2, I had expected a one year increase in age to predit an increase of *body_new* score. This prediction was supported, though the increase is fairly conservative at only a 0.0043 point increase per year.
+
+My final expectation, that the *age* variable would explain variability much more than the *sex_du* variable, was not very supported. Not only did age not greatly increase the explanatory power of the model, but the *sex_du* coefficient only decreased marginally. Overall, this model did not work to the magnitude that I expected, but the intuition behind my predicitions seems somewhat supported.
+
+# 3 Multiple regression
+
+I was curious about individuals using OK Cupid who identify themselves as being in some sort of partnership in the *status* variable. Below, I show the raw counts of how people identified their relationship status.
+```{r}
+cupid %>% dplyr::count(status)
+```
+I wanted to learn more about individuals who self-identify as seeing someone or being married. Do certain demographics predict whether someone on OK Cupid is in a partnership versus not? First, I decided to recode the *status* variable as a dummy variable representing individuals who identified as being in some sort of partnership (either seeing someone or married) versus those who didn't (either available or single). Although seeing someone and marriage are different levels of commitment, I felt that this was the most sensible grouping given I'm interested in partnered users of OK Cupid. I also was conscious of the possibility that someone might self-identify as "available" but still be partnered. Once again, I accepted this limitation given limited additional information about respondents' relationship statuses.
+
+```{r}
+# Creating the partnered variable through a recode of status
+cupid <- cupid %>% mutate(partnered = case_when(
+  status == "available" ~ 0,
+  status == "single" ~ 0,
+  status == "seeing someone" ~ 1,
+  status == "married" ~ 1
+))
+```
+After recoding, I made subset my variables of interest. I decided to focus on age and sex for this first regression. I hypothesized that an increase in age would increase the likelihood that a user was a partnered user of OK Cupid because individuals and couples might want to spice up their romantic and sexual lives in light of long-term stagnancy. Sex felt less straightforward than age, but I ultimately predicted that women, moreso than men, would be partnered users of OK Cupid. Though purely anecdotal, I have noticed that when heterosexual couples decide to open up their relationship or look for third partners, women often seem to take the charge.
+
+For this analysis, I subset the data and, this time, recoded the *age* variable so that the intercept would be at the mean age of respondents for ease of interpretability (the mean age is about 32).
+``` {r}
+# Subsetting data and removing rows with NAs, recoding age so the intercept
+# is at the mean age
+cupid4 <- cupid[ , c(1, 32, 34)] %>%
+  filter(!is.na(sex_du), !is.na(partnered), !is.na(age)) %>%
+  mutate(age = age - mean(age))
+
+# Regression
+lm_partnered <- lm(partnered ~ age + sex_du, data = cupid4)
+summary(lm_partnered)
+```
+The results are statistically significant at the 0.001 level, although the R squared is quite small as are the coefficients. Only about .28% of the variability in the *partnered* variable is explained by age and sex. The intercept is quite close to zero (at about 0.03), meaning that average aged males are, on average, not partnered. For each year increase in age, respondents are 0.0008 less likely to be partnered. This seems to reject my initial hypothesis, though it is important to note that while the results are statistically significant, the results may not be substantively significant. The statistical significance is likely coming from the very high number of observations (59933 degrees of freedom). Sex similarly has a small but statistically significant effect. Being a female increases one's chance of being partnered by 0.01.
+
+# 4 Adding another independent variable
+
+I was curious how this relationship might be impacted by accounting for whether a respondent identifies as straight or either bisexual or gay. Are heterosexual users more likely to identify as partnered on OK Cupid than bisexual or gay individuals? I hypothesized that heterosexual individuals would be more likely to identify as partnered than bisexual or gay individuals. Knowing that LGBTQ+ communities are often more tight knit, I hypothesized this relationship would be more likely because partnered LGBTQ+ individuals might find additional partners within their own communities more easily than by using an online dating platform. 
+```{r}
+# Recoding the orientation variable
+cupid <- cupid %>% mutate(orientation = case_when(
+  orientation == "straight" ~ 0,
+  orientation == "bisexual" ~ 1,
+  orientation == "gay" ~ 1
+))
+# Subsetting data and removing rows with NAs, recoding age so the intercept
+# is at the mean age
+cupid5 <- cupid[ , c(1, 4, 32, 34)] %>%
+  filter(!is.na(sex_du), !is.na(partnered), !is.na(age), !is.na(orientation)) %>%
+  mutate(age = age - mean(age))
+
+# Regression
+lm_partnered2 <- lm(partnered ~ age + sex_du + orientation, data = cupid5)
+summary(lm_partnered2)
+```
+Once again, all results are statistically significant although the adjust R squared remains small. About 0.9% of the variability is explained by the model, which is an increase of 0.0062 from the first model, and the degrees of freedom are likely impacting statistical significance greatly. The intercept in this model is still quite close to 0, sitting at about 0.02, slightly lower than in the first model without the *orientation* variable. The effects of *age* and *sex_du* remain quite similar to the last model. Looking at orientation, we see that for bisexual or gay individuals, there is a 0.04 increase in chance of being partnered than for heterosexual individuals. This is quite interesting and the opposite of what I expected. One possible further investigation would be to disaggregate gay and bisexual individuals and see whether one group or the other are having more of an effect.
+
+# 5 Partial F-test
+
+Lastly, I wanted to test whether including the *orientation* variable improved the fit of my model in a statistically significant way. To do so, I used the anova() function to run a partial F-test on the *lm_partnered* and *lm_partnered2* variables.
+```{r}
+anova(lm_partnered, lm_partnered2)
+```
+The very small p-value indicates that there is a very, very small probability that all of the variables are together equal to 0. This supports the idea of adding the new variable *orientation* because there is a statistically significant difference between the model without it and the model with it. Once again, the caveat is that the degrees of freedom and high *n* are likely doing a lot of the work in making both of these models and a comparison between them statistically significant.
+
+# Data Citation
+
+Kim, Albert and Adriana Escobedo-Land, 2015, "OkCupid Data for Introductory Statistics and Data Science Courses,"  *Journal of Statistics Education*, vol. 23, doi: 10.1080/10691898.2015.11889737
